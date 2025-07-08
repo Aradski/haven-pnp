@@ -43,7 +43,7 @@ class LatexFileGenerator():
         self.check_root_dir_consistency()
 
     def sanitize_path(p: str) -> str:
-        return p.replace("\\", "/").replace(" ", "\\ ")
+        return p.replace("\\", "/")
 
     def check_root_dir_consistency(self):
         """
@@ -80,7 +80,7 @@ class LatexFileGenerator():
         amd_back_path = Path(self.path_to_root_dir / "amd_back.jpg")
         if not amd_back_path.exists():
             amd_back_path = Path(self.path_to_root_dir / "amd_back.png")
-        amd_backs = [amd_back_path for _ in amd_paths];
+        amd_backs = [amd_back_path for _ in amd_paths]
 
         # NON_AMD
         non_amd_paths = list(Path(self.path_to_root_dir / "NON_AMD").glob("*.jpg")) + \
@@ -92,19 +92,17 @@ class LatexFileGenerator():
         non_amd_backs = [non_amd_back_path for _ in non_amd_paths]
 
         # Characater tokens
-        token_path = Path(self.path_to_root_dir / "character_token.jpg")
-        if not token_path.exists():
-            token_path = Path(self.path_to_root_dir / "character_token.png")
-        token_path = LatexFileGenerator.sanitize_path(str(token_path))
+        character_token_path = Path(self.path_to_root_dir / "character_token.jpg")
+        if not character_token_path.exists():
+            character_token_path = Path(self.path_to_root_dir / "character_token.png")
+        character_token_path = LatexFileGenerator.sanitize_path(str(character_token_path))
 
         # Arranging amd and non_amd
         all_amd = amd_paths + non_amd_paths
         all_backs = amd_backs + non_amd_backs
 
         all_amd_cards = [LatexFileGenerator.sanitize_path(str(p)) for p in (all_amd + all_backs)]
-        # TODO: I would move the tokens to be alongside the mat and mini
-        #  since these are more likely to be printed onto sticky paper
-        latex_code += self.amd_cards([str(c) for c in all_amd_cards], str(token_path))
+        latex_code += self.amd_cards([str(c) for c in all_amd_cards])
 
         # Character mat and mini
         mat_mini_paths = []
@@ -114,7 +112,24 @@ class LatexFileGenerator():
                 jpg_file = Path(self.path_to_root_dir / filename).with_suffix(".png")
             mat_mini_paths.append(jpg_file)
         mat_mini_paths = [LatexFileGenerator.sanitize_path(str(p)) for p in (mat_mini_paths)]
-        latex_code += self.character_mat(str(mat_mini_paths[0]), str(mat_mini_paths[1]), str(mat_mini_paths[2]), str(token_path))
+        latex_code += self.character_mat(str(mat_mini_paths[0]), str(mat_mini_paths[1]), str(mat_mini_paths[2]), str(character_token_path))
+
+        # Summons and overlay tokens
+        summon_paths = None
+        if Path(self.path_to_root_dir / "summons").exists():
+            summon_paths = list(Path(self.path_to_root_dir / "summons").glob("*.jpg")) + list(
+                Path(self.path_to_root_dir / "summons").glob("*.png"))
+            summon_paths.sort()
+            summon_paths = [LatexFileGenerator.sanitize_path(str(p)) for p in (summon_paths)]
+
+        overlay_tokens_paths = None
+        if Path(self.path_to_root_dir / "OverlayTokens").exists():
+            overlay_tokens_paths = list(Path(self.path_to_root_dir / "OverlayTokens").glob("*.jpg")) + list(
+                Path(self.path_to_root_dir / "OverlayTokens").glob("*.png"))
+            overlay_tokens_paths.sort()
+            overlay_tokens_paths = [LatexFileGenerator.sanitize_path(str(p)) for p in (overlay_tokens_paths)]
+
+        latex_code += self.summons_and_tokens(summon_paths, overlay_tokens_paths)
 
         # Character sheet
         sheet = Path(self.path_to_root_dir / "character_sheet.jpg")
@@ -155,8 +170,8 @@ class LatexFileGenerator():
 \begin{figure}[ht]
 \centering
 \makebox[1\textwidth]{
-\includegraphics[height=14cm]{""" + path_to_sheet + r"""}\hspace{0cm}%
-\includegraphics[height=14cm]{""" + path_to_sheet + r"""}
+\includegraphics[height=14cm]{" """ + path_to_sheet + r""" "} \hspace{0cm}%
+\includegraphics[height=14cm]{" """ + path_to_sheet + r""" "}
 }
 \end{figure}
 
@@ -179,7 +194,7 @@ class LatexFileGenerator():
         if self.rotate_amd_cards:
             add_rotation = "angle=90, "
         for i in range(len(amd_paths)):
-            res += r"  \includegraphics[" + add_rotation + r"width=4.4cm]{" + amd_paths[i] + r"}"
+            res += r"  \includegraphics[" + add_rotation + r"width=4.4cm]{""" + '"' + amd_paths[i] + '"' + r"}"
             if i != len(amd_paths) - 1 and i != 4:
                 res += r"\hspace{0cm}%" + "\n"
             if i == 4:  # create new line of AMDs
@@ -196,7 +211,7 @@ class LatexFileGenerator():
 """
         return res
 
-    def amd_cards(self, amd_paths: list[str], character_token_path: str):
+    def amd_cards(self, amd_paths: list[str]):
         res = ""
         n = len(amd_paths)
         cards_per_page = 10
@@ -228,7 +243,7 @@ class LatexFileGenerator():
         if not self.is_a4 and self.has_bleed:
             cards_per_line = 3
         for i in range(len(card_paths)):
-            res += r"   \includegraphics{" + card_paths[i] + r"}"
+            res += r"   \includegraphics{" + '"' + card_paths[i] + '"' + r"}"
             if i != len(card_paths) - 1 and i != cards_per_line - 1:
                 res += r"\hspace{0cm}%" + "\n"
             if i == cards_per_line - 1:
@@ -263,41 +278,40 @@ class LatexFileGenerator():
         return res
 
     def character_mat(self,
-                      mat_front_path: str,
-                      mat_back_path: str,
-                      characer_mini_path: str,
-                      token_path: str):
+                  mat_front_path: str,
+                  mat_back_path: str,
+                  characer_mini_path: str,
+                  token_path: str):
         res = r"""\begin{figure}[ht]
-            \centering
-            \makebox[1\textwidth]{
-                \includegraphics[angle=90,width=9.5cm,height=14.5cm]{""" + mat_front_path + r"""}\hspace{0.5cm}%
-                \includegraphics[angle=90,width=9.5cm,height=14.5cm]{""" + mat_back_path + r"""}\hspace{0.5cm}%
-                \raisebox{7.5cm}[0pt][0pt]{%
-                    \parbox[c]{4cm}{
-                        \includegraphics[width=4cm]{""" + characer_mini_path + r"""}\\[0.5cm]
-                        \scalebox{-1}[1]{\includegraphics[width=4cm]{""" + characer_mini_path + r"""}}%
-                    }
+        \centering
+        \makebox[1\textwidth]{
+            \includegraphics[angle=90,width=9.5cm,height=14.5cm]{" """ + mat_front_path + r""" "}\hspace{0.5cm}%
+            \includegraphics[angle=90,width=9.5cm,height=14.5cm]{" """ + mat_back_path + r""" "}\hspace{0.5cm}%
+            \raisebox{7.5cm}[0pt][0pt]{%
+                \parbox[c]{4cm}{
+                    \includegraphics[width=4cm]{" """ + characer_mini_path + r""" "}\\[0.5cm]
+                    \scalebox{-1}[1]{\includegraphics[width=4cm]{" """ + characer_mini_path + r""" "}}%
                 }
             }
-            
-            \vspace{0.5cm}
-            \makebox[1\textwidth]{%
+        }
+        
+        \vspace{0.5cm}
+        \makebox[1\textwidth]{%
 """
         # First row: 10 normal tokens
         for i in range(10):
-            res += r"  \includegraphics[width=1.45cm]{" + token_path + r"}"
+            res += r"  \includegraphics[width=1.45cm]{""" + '"' + token_path + '"' + r"}"
             if i != 9:
                 res += r"\hspace{0cm}%"
             res += "\n"
 
         res += r"""
-        }
-        \makebox[1\textwidth]{%
+    }
+    \makebox[1\textwidth]{%
 """
-
         # Second row: 10 flipped tokens
         for i in range(10):
-            res += r"  \scalebox{-1}[1]{\includegraphics[width=1.45cm]{" + token_path + r"}}"
+            res += r"  \scalebox{-1}[1]{\includegraphics[width=1.45cm]{""" + '"' + token_path + '"' + r"}}"
             if i != 9:
                 res += r"\hspace{0cm}%"
             res += "\n"
@@ -308,6 +322,76 @@ class LatexFileGenerator():
         \clearpage
         """
         return res
+
+    def summons_and_tokens(self,
+                       summon_paths: list[str] | None = None,
+                       overlay_token_paths: list[str] | None = None):
+
+        if not summon_paths and not overlay_token_paths:
+            return ""
+
+        res = r"""\begin{figure}[ht]
+\centering
+"""
+
+        max_width_cm = 28.0
+        spacing_cm = 0.2
+
+        # --- Summons (normal + flipped) ---
+        if summon_paths:
+            current_width = 0.0
+            res += r"\makebox[1\textwidth]{" + "\n"
+            for i, path in enumerate(summon_paths):
+                for flipped in [False, True]:
+                    graphic = (r"\scalebox{-1}[1]{\includegraphics[width=4cm]{""" + '"' + path + '"' + r"}}"
+                               if flipped else
+                               r"\includegraphics[width=4cm]{""" + '"' + path + '"' + r"}")
+                    if current_width + 4.0 > max_width_cm:
+                        res += r"""
+}
+\vspace{0.3cm}
+\makebox[1\textwidth]{""" + "\n"
+                        current_width = 0.0
+                    res += "  " + graphic + "\n"
+                    current_width += 4.0
+                    if current_width + spacing_cm <= max_width_cm:
+                        res += r"\hspace{" + f"{spacing_cm}cm" + r"}%" + "\n"
+                        current_width += spacing_cm
+            res += r"""
+}
+\vspace{0.3cm}
+"""
+
+        # --- Overlay Tokens (normal + flipped) ---
+        if overlay_token_paths:
+            current_width = 0.0
+            res += r"\makebox[1\textwidth]{" + "\n"
+            for i, path in enumerate(overlay_token_paths):
+                for flipped in [False, True]:
+                    graphic = (r"\scalebox{-1}[1]{\includegraphics[width=2.7cm,height=2.7cm]{""" + '"' + path + '"' + r"}}"
+                               if flipped else
+                               r"\includegraphics[width=2.7cm,height=2.7cm]{""" + '"' + path + '"' + r"}")
+                    if current_width + 2.7 > max_width_cm:
+                        res += r"""
+}
+\vspace{0.3cm}
+\makebox[1\textwidth]{""" + "\n"
+                        current_width = 0.0
+                    res += "  " + graphic + "\n"
+                    current_width += 2.7
+                    if current_width + spacing_cm <= max_width_cm:
+                        res += r"\hspace{" + f"{spacing_cm}cm" + r"}%" + "\n"
+                        current_width += spacing_cm
+            res += r"""
+}
+"""
+
+        res += r"""
+\end{figure}
+\clearpage
+"""
+        return res
+
 
 
 argparser = argparse.ArgumentParser()
