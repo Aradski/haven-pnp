@@ -114,7 +114,7 @@ class LatexFileGenerator():
                 jpg_file = Path(self.path_to_root_dir / filename).with_suffix(".png")
             mat_mini_paths.append(jpg_file)
         mat_mini_paths = [LatexFileGenerator.sanitize_path(str(p)) for p in (mat_mini_paths)]
-        latex_code += self.character_mat(str(mat_mini_paths[0]), str(mat_mini_paths[1]), str(mat_mini_paths[2]))
+        latex_code += self.character_mat(str(mat_mini_paths[0]), str(mat_mini_paths[1]), str(mat_mini_paths[2]), str(token_path))
 
         # Character sheet
         sheet = Path(self.path_to_root_dir / "character_sheet.jpg")
@@ -164,11 +164,10 @@ class LatexFileGenerator():
         return res + res  # Back of the character sheet is the same as the front for now
 
     def amd_cards_one_page(self,
-                           amd_paths: list[str],
-                           token_path: str | None = None):
+                           amd_paths: list[str]):
         """
         Helper function to generate latex code for a single AMD page. Holds up 10 cards
-        in two rows of 5. Character tokens can also be added
+        in two rows of 5.
         """
         res = r"""\begin{figure}[ht]
   \centering
@@ -180,8 +179,6 @@ class LatexFileGenerator():
         if self.rotate_amd_cards:
             add_rotation = "angle=90, "
         for i in range(len(amd_paths)):
-            # TODO: need to adjust this; provided width is 4.3cm, but we already have a height issue,
-            #  and this will make it worse?
             res += r"  \includegraphics[" + add_rotation + r"width=4.4cm]{" + amd_paths[i] + r"}"
             if i != len(amd_paths) - 1 and i != 4:
                 res += r"\hspace{0cm}%" + "\n"
@@ -190,17 +187,6 @@ class LatexFileGenerator():
 }
 \makebox[\textwidth]{
 """
-
-        if token_path is not None:
-            res += r"""
-}
-\makebox[1\textwidth]{""" + "\n"
-            for i in range(5):
-                res += r"  \includegraphics[width=1.45cm]{" + token_path + r"}"
-                res += r"\hspace{0cm}%" + "\n"
-                res += r"  \scalebox{-1}[1]{\includegraphics[width=1.45cm]{" + token_path + r"}}"
-                if i != 9:
-                    res += r"\hspace{0cm}%" + "\n"
         res += r"""
 }
 \end{figure}
@@ -218,11 +204,7 @@ class LatexFileGenerator():
 
         for i in range(num_pages):
             amds_in_page = amd_paths[cards_per_page * i: cards_per_page * (i + 1)]
-            if i != num_pages - 1:
-                res += self.amd_cards_one_page(amds_in_page)
-            else:
-                # Last page: also add character tokens
-                res += self.amd_cards_one_page(amds_in_page, character_token_path)
+            res += self.amd_cards_one_page(amds_in_page)
         return res
 
     def ability_cards_one_page(self,
@@ -283,30 +265,48 @@ class LatexFileGenerator():
     def character_mat(self,
                       mat_front_path: str,
                       mat_back_path: str,
-                      characer_mini_path: str):
+                      characer_mini_path: str,
+                      token_path: str):
         res = r"""\begin{figure}[ht]
-\centering
-\makebox[1\textwidth]{
-\includegraphics[width=14.5cm,height=9.5cm]{""" + mat_front_path + r"""}\hspace{0cm}%
-}
-\makebox[1\textwidth]{
-	\includegraphics[width=4cm]{""" + characer_mini_path + r"""}
-}
-\end{figure}
+            \centering
+            \makebox[1\textwidth]{
+                \includegraphics[angle=90,width=9.5cm,height=14.5cm]{""" + mat_front_path + r"""}\hspace{0.5cm}%
+                \includegraphics[angle=90,width=9.5cm,height=14.5cm]{""" + mat_back_path + r"""}\hspace{0.5cm}%
+                \raisebox{7.5cm}[0pt][0pt]{%
+                    \parbox[c]{4cm}{
+                        \includegraphics[width=4cm]{""" + characer_mini_path + r"""}\\[0.5cm]
+                        \scalebox{-1}[1]{\includegraphics[width=4cm]{""" + characer_mini_path + r"""}}%
+                    }
+                }
+            }
+            
+            \vspace{0.5cm}
+            \makebox[1\textwidth]{%
+"""
+        # First row: 10 normal tokens
+        for i in range(10):
+            res += r"  \includegraphics[width=1.45cm]{" + token_path + r"}"
+            if i != 9:
+                res += r"\hspace{0cm}%"
+            res += "\n"
 
-\clearpage
+        res += r"""
+        }
+        \makebox[1\textwidth]{%
+"""
 
-\begin{figure}[ht]
-\centering
-\makebox[1\textwidth]{
-\includegraphics[width=14.5cm,height=9.5cm]{""" + mat_back_path + r"""}%
-}
-\makebox[1\textwidth]{
-\scalebox{-1}[1]{\includegraphics[width=4cm]{""" + characer_mini_path + r"""}}\hspace{0cm}%
-}
-\end{figure}
+        # Second row: 10 flipped tokens
+        for i in range(10):
+            res += r"  \scalebox{-1}[1]{\includegraphics[width=1.45cm]{" + token_path + r"}}"
+            if i != 9:
+                res += r"\hspace{0cm}%"
+            res += "\n"
 
-\clearpage"""
+        res += r"""
+        }
+        \end{figure}
+        \clearpage
+        """
         return res
 
 
